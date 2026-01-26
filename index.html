@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="./css/bootstrap.css">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="./icons/bootstrap-icons.css">
+    <title>app test</title>
+    <style>
+        /* ================================
+           アプリ全体のレイアウト制御
+           ================================ */
+        /* 
+          mainタグを最大限大きくして固定する
+          body は 100dvh 固定・スクロール禁止
+        */
+        body {
+            display: flex;
+            flex-direction: column;
+            height: 100dvh; /* スマホのアドレスバーを除いた画面の高さ */
+            margin: 0;
+            overflow: hidden; /* スクロールを禁止する */
+        }
+        /* main はヘッダーを除いた残り全体 */
+        main {
+            flex-grow: 1; 
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ボタン非表示制御 */
+        .btn-hidden {
+            display: none !important;
+        }
+
+        /* ================================
+           グラフコンテナ全体
+           ================================ */
+        /*
+          graph-container は常に存在する
+          中に graph-top, graph-bottom を縦に並べる
+        */
+        #graph-container {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;   /* 縦並び固定 */
+            gap: 4px;
+            background-color: #ffffff;
+        }
+
+        /* ================================
+           個別グラフ領域
+           ================================ */
+        /* 上下グラフ共通 */
+        .graph-panel {
+            flex-grow: 1;              /* 2個表示時は 50% / 50% */
+            min-height: 0;             /* Plotly の resize 崩れ防止 */
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            /* グラフがはみ出さないようにする */
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        /*
+        1画面表示モード用
+        片方を非表示にする
+        */
+        .graph-hidden {
+            display: none !important;
+        }
+
+        /* ダークモード微調整 */
+        [data-bs-theme="dark"] #graph-container {
+            background-color: #212529;
+        }
+
+        [data-bs-theme="dark"] .graph-panel {
+            border-color: #495057;
+        }
+
+    </style>
+</head>
+<body class="bg-light">
+
+    <!-- ナビゲーションバー（ヘッダー） -->
+    <nav class="navbar navbar-dark bg-dark sticky-top">
+        <div class="container-fluid">
+            <button class="navbar-toggler" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasNavbar">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <span class="navbar-brand mb-0 h1">モニターアプリ</span>
+            <div class="d-flex">
+                <!-- クイックな状態表示用アイコンなど（任意） -->
+                <i class="bi bi-broadcast text-danger"></i>
+            </div>
+        </div>
+    </nav>
+
+    <!-- メインコンテンツ -->
+    <main class="container-fluid py-3">
+        <!-- グラフ表示エリア -->
+        <div id="graph-container" class="d-flex align-items-center justify-content-center mb-3 rounded">
+            <!-- ここにグラフが表示されます -->
+            <div id="graph1" class="graph-panel"></div>
+            <div id="graph2" class="graph-panel"></div>
+        </div>
+        <!-- メイン操作ボタン -->
+        <div class="row g-2">
+            <div class="col-6">
+                <button class="btn btn-success btn-lg w-100 shadow-sm" id="btnStart"><i class="bi bi-play-fill"></i><br><small>START</small></button>
+                <button class="btn btn-danger  btn-lg w-100 shadow-sm btn-hidden" id="btnStop" ><i class="bi bi-stop-fill"></i><br><small>STOP</small></button>
+            </div>
+            <div class="col-6">
+                <button class="btn btn-warning btn-lg w-100 shadow-sm text-white"><i class="bi bi-arrow-counterclockwise"></i><br><small>RESET</small></button>
+            </div>
+        </div>
+    </main>
+
+    <!-- オフキャンバスメニュー -->
+    <div class="offcanvas offcanvas-start" tabindex="-1" id="offcanvasNavbar">
+        <div class="offcanvas-header">
+            <h5 class="offcanvas-title">メニュー</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+        </div>
+        <div class="offcanvas-body">
+            <ul class="navbar-nav justify-content-end flex-grow-1 pe-3">
+                <li class="nav-item">
+                    <a class="nav-link text-dark" href="#" data-bs-toggle="modal" data-bs-target="#settingsModal" id="settingsButton">
+                        <i class="bi bi-gear-fill me-2"></i>設定
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link text-dark" href="#"><i class="bi bi-lightning-fill me-2"></i>特殊機能</a>
+                </li>
+                <li class="nav-item border-top mt-2"></li>
+                <li class="nav-item">
+                    <a class="nav-link text-dark" href="#" data-bs-toggle="modal" data-bs-target="#manualModal">
+                        <i class="bi bi-book-fill me-2"></i>マニュアル
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link text-dark" href="#" data-bs-toggle="modal" data-bs-target="#aboutModal">
+                        <i class="bi bi-info-circle-fill me-2"></i>About
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link text-dark" href="#" data-bs-toggle="modal" data-bs-target="#PrivacyPolicyModal">
+                        <i class="bi bi-shield-lock-fill me-2"></i>プライバシーポリシー
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+
+    <!-- 設定モーダル -->
+    <div class="modal fade" id="settingsModal" tabindex="-1" aria-labelledby="settingsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="settingsModalLabel"><i class="bi bi-gear-fill me-2"></i>設定</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <!-- タブナビゲーション -->
+                    <ul class="nav nav-tabs sticky-top bg-white pt-2 px-2" id="settingsTab" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active small" data-bs-toggle="tab" data-bs-target="#display-tab" type="button">ディスプレイ</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link small" data-bs-toggle="tab" data-bs-target="#fft-tab" type="button">FFT</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link small" data-bs-toggle="tab" data-bs-target="#app-tab" type="button">アプリ</button>
+                        </li>
+                    </ul>
+
+                    <!-- タブコンテンツ -->
+                    <div class="tab-content p-3" id="settingsTabContent">
+                        
+                        <!-- ディスプレイ設定 -->
+                        <div class="tab-pane fade show active" id="display-tab" role="tabpanel">
+                            <h6 class="border-bottom pb-2 mb-3">グラフ表示</h6>
+                            <div class="mb-4" id="graphType">
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="radio" name="graphType" id="fftWaterfall" checked>
+                                    <label class="form-check-label" for="fftWaterfall">FFT + ウォーターフォール</label>
+                                </div>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="radio" name="graphType" id="fftColor">
+                                    <label class="form-check-label" for="fftColor">FFT + カラープロット</label>
+                                </div>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="radio" name="graphType" id="waterfallColor">
+                                    <label class="form-check-label" for="waterfallColor">ウォーターフォール + カラープロット</label>
+                                </div>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="radio" name="graphType" id="waveColor">
+                                    <label class="form-check-label" for="waveColor">波形 + カラープロット</label>
+                                </div>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="radio" name="graphType" id="waveFft">
+                                    <label class="form-check-label" for="waveFft">波形 + FFT</label>
+                                </div>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="radio" name="graphType" id="fftOnly">
+                                    <label class="form-check-label" for="fftOnly">FFT</label>
+                                </div>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="radio" name="graphType" id="waterfallOnly">
+                                    <label class="form-check-label" for="waterfallOnly">ウォーターフォール</label>
+                                </div>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="radio" name="graphType" id="colorOnly">
+                                    <label class="form-check-label" for="colorOnly">カラープロット</label>
+                                </div>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="radio" name="graphType" id="waveOnly">
+                                    <label class="form-check-label" for="waveOnly">波形</label>
+                                </div>
+                            </div>
+
+                            <h6 class="border-bottom pb-2 mb-3">表示オプション</h6>
+                            <div class="list-group list-group-flush border-bottom mb-3">
+                                <!-- 項目1 -->
+                                <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                    <label class="form-check-label py-1" for="autoScale">オートスケール</label>
+                                    <div class="form-check form-switch m-0">
+                                        <input class="form-check-input" type="checkbox" id="autoScale" role="switch">
+                                    </div>
+                                </div>
+                                <!-- 項目2 -->
+                                <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                    <label class="form-check-label py-1" for="dbDisplay">デシベル表示</label>
+                                    <div class="form-check form-switch m-0">
+                                        <input class="form-check-input" type="checkbox" id="dbDisplay" role="switch">
+                                    </div>
+                                </div>
+                                <!-- 項目3 -->
+                                <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                    <label class="form-check-label py-1" for="freqLog">周波数LOG表示</label>
+                                    <div class="form-check form-switch m-0">
+                                        <input class="form-check-input" type="checkbox" id="freqLog" role="switch">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <h6 class="border-bottom pb-2 mb-3">振幅</h6>
+                            <div class="row g-3 mb-4">
+                                <div class="col-6">
+                                    <label class="form-label small">最大</label>
+                                    <input type="number" class="form-control" id="maxAmplitudeInput" placeholder="振幅の最大値">
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small">最小</label>
+                                    <input type="number" class="form-control" id="mimAmplitudeInput" placeholder="振幅の最小値">
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small">記録時間</label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control" id="recordDurationSec" placeholder="60">
+                                        <span class="input-group-text">sec</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <h6 class="border-bottom pb-2 mb-3">カラースケール</h6>
+                            <div class="d-flex gap-3" id="colorScale">
+                                <div class="form-check"><input class="form-check-input" type="radio" name="colorScale" id="colorScaleStandard" checked><label class="form-check-label" for="colorScaleStandard">標準</label></div>
+                                <div class="form-check"><input class="form-check-input" type="radio" name="colorScale" id="colorScaleGreen"><label class="form-check-label" for="colorScaleGreen">緑</label></div>
+                                <div class="form-check"><input class="form-check-input" type="radio" name="colorScale" id="colorScaleWhite"><label class="form-check-label" for="colorScaleWhite">白</label></div>
+                            </div>
+
+                            <h6 class="border-bottom pb-2 mb-3">グラフ操作</h6>
+                            <div class="list-group list-group-flush border-bottom mb-3">
+                                <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                    <label class="form-check-label py-1" for="autoScrollMode">自動スクロールモード</label>
+                                    <div class="form-check form-switch m-0">
+                                        <input class="form-check-input" type="checkbox" id="autoScrollMode" role="switch">
+                                    </div>
+                                </div>
+                                <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                    <label class="form-check-label py-1" for="autoPeakCursor">自動ピークカーソル</label>
+                                    <div class="form-check form-switch m-0">
+                                        <input class="form-check-input" type="checkbox" id="autoPeakCursor" role="switch">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- FFT設定 -->
+                        <div class="tab-pane fade" id="fft-tab" role="tabpanel">
+                            <h6 class="border-bottom pb-2 mb-3">サンプリング周波数 (Hz)</h6>
+                            <select class="form-select mb-4" id="samplingRate">
+                                <option selected>96000</option>
+                                <option>48000</option>
+                                <option>44100</option>
+                                <option>22050</option>
+                                <option>16000</option>
+                                <option>8000</option>
+                                <option>4000</option>
+                            </select>
+
+                            <h6 class="border-bottom pb-2 mb-3" id="fftWindow">FFT 窓関数</h6>
+                            <div class="mb-4">
+                                <div class="form-check"><input class="form-check-input" type="radio" name="winFunc" id="fftWindowBlackman" checked><label class="form-check-label" for="fftWindowBlackman">ブラックマン</label></div>
+                                <!-- 
+                                <div class="form-check"><input class="form-check-input" type="radio" name="winFunc" id="fftWindowHanning"><label class="form-check-label" for="fftWindowHanning">ハニング</label></div>
+                                <div class="form-check"><input class="form-check-input" type="radio" name="winFunc" id="fftWindowFlatTop"><label class="form-check-label" for="fftWindowFlatTop">フラットトップ</label></div>
+                                <div class="form-check"><input class="form-check-input" type="radio" name="winFunc" id="fftWindowRect"><label class="form-check-label" for="fftWindowRect">矩形</label></div>
+                                -->
+                            </div>
+
+                            <h6 class="border-bottom pb-2 mb-3">FFT Size <small class="text-muted">(1:Fast -> 8:Accurate)</small></h6>
+                            <div class="btn-group w-100" role="group" id="fftSizeGroup">
+                                <input type="radio" class="btn-check" name="fftSize" id="fftSize1" checked><label class="btn btn-outline-primary" for="fftSize1">1</label>
+                                <input type="radio" class="btn-check" name="fftSize" id="fftSize2"><label class="btn btn-outline-primary" for="fftSize2">2</label>
+                                <input type="radio" class="btn-check" name="fftSize" id="fftSize4"><label class="btn btn-outline-primary" for="fftSize4">4</label>
+                                <input type="radio" class="btn-check" name="fftSize" id="fftSize8"><label class="btn btn-outline-primary" for="fftSize8">8</label>
+                                <input type="radio" class="btn-check" name="fftSize" id="fftSize16"><label class="btn btn-outline-primary" for="fftSize16">16</label>
+                                <input type="radio" class="btn-check" name="fftSize" id="fftSize32"><label class="btn btn-outline-primary" for="fftSize32">32</label>
+                            </div>
+                        </div>
+
+                        <!-- アプリ設定 -->
+                        <div class="tab-pane fade" id="app-tab" role="tabpanel">
+                            <h6 class="border-bottom pb-2 mb-3">補正設定</h6>
+                            <div class="mb-3">
+                                <label class="form-label">デシベルの補正ゲイン</label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" id="dbCorrectionGain" value="0.0">
+                                    <span class="input-group-text">dB</span>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="cancelSettings" data-bs-dismiss="modal">キャンセル</button>
+                    <button type="button" class="btn btn-primary" id="applySettings">設定を適用</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- マニュアル モーダル -->
+    <div class="modal fade" id="manualModal" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">マニュアル</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <h6>使い方</h6>
+                    <p>START/STOP：モニターの開始・停止を行います。</p>
+                    <p>RESET：過去のデータをクリアします。</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Aboutモーダル -->
+    <div class="modal fade" id="aboutModal" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">About</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>ツール名：Monitor v1.0<br>開発：2026年</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- PrivacyPolicyモーダル -->
+    <div class="modal fade" id="PrivacyPolicyModal" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">PrivacyPolicy</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <h6>免責事項</h6>
+                    <p>アプリの使用によって生じたトラブルについては、責任を負いかねますのでご了承ください。</p>
+                    <h6>問い合わせ先</h6>
+                    <p>ここにメールアドレスなどを書く。</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="./js/plotly-3.3.0.min.js" charset="utf-8"></script>
+    <script src="./js/bootstrap.bundle.js"></script>
+    <script src="./js/app.js"></script>
+    <script src="./js/appSound.js"></script>
+</body>
+</html>
