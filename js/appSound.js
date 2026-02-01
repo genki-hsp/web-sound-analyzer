@@ -59,6 +59,7 @@ class WebAudioSpectrumEngine {
         // 最低限の初期設定
         this.analyser.fftSize = 1024;   // 後で config で変更されます。
         this.analyser.smoothingTimeConstant = 0;
+        // this.analyser.minDecibels = -100
 
         source.connect(this.analyser);
 
@@ -337,10 +338,31 @@ const MeasurementController = (function () {
         }
         lastFFTTime = now;
 
-        // FFT, 波形, 時間軸（FFT）
-        latestSpectrum = engine.getSpectrum();
+        // FFT
+        // デシベルの補正ゲインで補正。
+        // 本来ならデバイスごとに異なるマイクの補正ゲインで補正すべきだが、今回は省略。
+        const raw = engine.getSpectrum();
+        if (!raw) return;
+        latestSpectrum = applyDbOffset(raw, currentConfig.dbCorrectionGain);    // 補正
+        // 波形, 時間軸（FFT）
         latestWaveform = engine.getWaveform();
         latestTimeSec  = engine.getCurrentTime() - measurementStartTime;
+    }
+
+    /**
+     * デシベル値の配列を指定値で増幅する
+     * デシベル値の配列にoffsetDbを加算します。
+     * 
+     * @param {*} rawSpectrum 
+     * @param {*} offsetDb 
+     * @returns 
+     */
+    function applyDbOffset(rawSpectrum, offsetDb) {
+        const out = new Float32Array(rawSpectrum.length);
+        for (let i = 0; i < rawSpectrum.length; i++) {
+            out[i] = rawSpectrum[i] + offsetDb;
+        }
+        return out;
     }
 
     /**
@@ -499,6 +521,32 @@ const GraphManager = (function () {
             default:
                 break;
         }
+
+        // Plotly.jsのイベント
+        const div = document.getElementById(panel.divId);
+        div.on('plotly_relayouting', () => {
+            
+        });
+
+        div.on('plotly_relayout', (event) => {
+            // オートスケールOFFのときだけ処理
+            if (currentConfig.autoScale) return;
+            
+            // FFT / 波形 用（2D）
+            if ('yaxis.range[0]' in event && 'yaxis.range[1]' in event) {
+                currentConfig.minAmplitudeInput = event['yaxis.range[0]'];
+                currentConfig.maxAmplitudeInput = event['yaxis.range[1]'];
+                //notifyConfigChanged(currentConfig);
+                applySpectrogramScale();
+            }
+
+            // Waterfall（3D）
+            if ('scene.zaxis.range[0]' in event && 'scene.zaxis.range[1]' in event) {
+                currentConfig.minDb = event['scene.zaxis.range[0]'];
+                currentConfig.maxDb = event['scene.zaxis.range[1]'];
+                //notifyConfigChanged(currentConfig);
+            }
+        });
     }
 
     /**
@@ -589,12 +637,24 @@ const GraphManager = (function () {
             x: [],
             y: [],
             z: [],
-            showlegend: false
+            showlegend: false,
+            line: {
+                width: 2,
+                color: [],
+                colorscale: "Jet",
+                cmin: 120,
+                cmax: 0
+            }
         };
 
         const layout = buildLayout("waterfall");
 
-        Plotly.newPlot(panel.divId, [trace], layout, { responsive: true });
+        Plotly.newPlot(
+            panel.divId, 
+            [trace], 
+            layout, 
+            { responsive: true }
+        );
     }
 
     /**
@@ -660,6 +720,8 @@ const GraphManager = (function () {
         cancelAnimationFrame(animationId);
     }
 
+
+    const FIXED_FREQ_RANGE = [0, 10000];
     /**
      * 設定反映
      * graphType に応じて graph1 / graph2 を切り替える
@@ -689,6 +751,57 @@ const GraphManager = (function () {
         // graph1 / graph2 に反映
         setGraph1Type(types[0]);
         setGraph2Type(types[1]);
+
+        // オートスケール
+        const auto = config.autoScale === true;
+
+        panels.forEach(panel => {
+            if (panel.type === "empty") return;
+
+            let layoutUpdate = {};
+
+            if (panel.type === "spectrogram") {
+                layoutUpdate = {
+                    //xaxis:        { autorange: true },
+                    yaxis: auto 
+                        ? { autorange: true } 
+                        : { autorange: false, range: FIXED_FREQ_RANGE }
+                };
+            }
+
+            if (panel.type === "fft") {
+                layoutUpdate = {
+                    xaxis: auto 
+                        ? { autorange: true } 
+                        : { autorange: false, range: FIXED_FREQ_RANGE },
+                    yaxis: auto 
+                        ? { autorange: true } 
+                        : { autorange: false, range: [config.minAmplitudeInput, config.maxAmplitudeInput] }
+                };
+            }
+
+            if (panel.type === "waveform") {
+                layoutUpdate = {
+                    yaxis: auto 
+                        ? { autorange: true } 
+                        : { autorange: false, range: [-1, 1] }
+                };
+            }
+
+            if (panel.type === "waterfall") {
+                layoutUpdate = {
+                    "scene.xaxis.autorange": auto,
+                    "scene.xaxis.range": auto ? undefined : FIXED_FREQ_RANGE,
+                    "scene.zaxis.autorange": auto,
+                    "scene.zaxis.range": auto 
+                        ? undefined 
+                        : [config.minAmplitudeInput, config.maxAmplitudeInput]
+                };
+            }
+
+            Plotly.relayout(panel.divId, layoutUpdate);
+            applySpectrogramScale();
+        });
     }
 
     /**
@@ -728,7 +841,6 @@ const GraphManager = (function () {
         });
     }
 
-
     /**
      * メイン描画ループ
      */
@@ -738,7 +850,7 @@ const GraphManager = (function () {
         panels.forEach(panel => {
             updatePanel(panel);
         });
-
+        
         animationId = requestAnimationFrame(loop);
     }
 
@@ -802,7 +914,7 @@ const GraphManager = (function () {
         Plotly.restyle(panel.divId, {
             z: [transpose(panel.spectrogram)],
             x: [panel.timeAxis]
-        });
+        }, [0]);
     }
 
     /**
@@ -838,6 +950,7 @@ const GraphManager = (function () {
         });
     }
 
+    let waterfallDrawCounter = 0
     const MAX_WATERFALL_FRAMES = 80;
     /**
      * ウォーターフォール更新
@@ -856,7 +969,11 @@ const GraphManager = (function () {
             panel.waterfallFrames.shift();
         }
 
+        waterfallDrawCounter++;
+        if (waterfallDrawCounter % 3 !== 0) return;
+
         const freqAxis = MeasurementController.getFrequencyAxis();
+        const auto = currentConfig.autoScale === true
 
         const traces = panel.waterfallFrames.map((frame, i) => {
             return {
@@ -867,14 +984,27 @@ const GraphManager = (function () {
                 z: frame,
                 line: {
                     width: 2,
-                    color: frame,                // ← 振幅で色を決める
-                    colorscale: "Jet"        // ← spectrogramと同系色
+                    color: frame,
+                    colorscale: "Jet",
+                    cmin: auto ? undefined : currentConfig.minAmplitudeInput,
+                    cmax: auto ? undefined : currentConfig.maxAmplitudeInput
                 },
                 showlegend: false
             };
         });
 
-        const layout = buildLayout("waterfall");
+        const layout = document.getElementById(panel.divId).layout;
+        if (auto){
+            layout.scene.zaxis.autorange = true;
+            layout.scene.zaxis.range = undefined;
+        } else {
+            layout.scene.zaxis.autorange = false;
+            layout.scene.zaxis.range = [
+                currentConfig.minAmplitudeInput,
+                currentConfig.maxAmplitudeInput
+            ];
+        }
+        layout.uirevision = "waterfall";
         Plotly.react(panel.divId, traces, layout);
     }
 
@@ -891,7 +1021,8 @@ const GraphManager = (function () {
                     title: { text: "Spectrogram" },
                     xaxis: { title: { text: "Time [s]" } },
                     yaxis: { title: { text: "Frequency [Hz]" } },
-                    margin: { t: 40, l: 60, r: 20, b: 40 }
+                    margin: { t: 40, l: 60, r: 20, b: 40 },
+                    uirevision: "spectrogram"
                 };
 
             case "fft":
@@ -899,7 +1030,8 @@ const GraphManager = (function () {
                     title: { text: "FFT Spectrum" },
                     xaxis: { title: { text: "Frequency [Hz]" } },
                     yaxis: { title: { text: "Amplitude" } },
-                    margin: { t: 40, l: 60, r: 20, b: 40 }
+                    margin: { t: 40, l: 60, r: 20, b: 40 },
+                    uirevision: "fft"
                 };
 
             case "waveform":
@@ -907,7 +1039,8 @@ const GraphManager = (function () {
                     title: { text: "Waveform" },
                     xaxis: { title: { text: "Time [s]" } },
                     yaxis: { title: { text: "Amplitude" } },
-                    margin: { t: 40, l: 60, r: 20, b: 40 }
+                    margin: { t: 40, l: 60, r: 20, b: 40 },
+                    uirevision: "waveform"
                 };
 
             case "waterfall":
@@ -921,6 +1054,7 @@ const GraphManager = (function () {
                             eye: { x: 1.6, y: -1.8, z: 1.2 }  // 斜め上から
                         }
                     },
+                    uirevision: "waterfall",
                     showlegend: false,
                     margin: { t: 20, l: 0, r: 0, b: 0 }
                 };
@@ -929,6 +1063,31 @@ const GraphManager = (function () {
                 return {};
         }
     }
+
+    /**
+     * スペクトログラムのカラースケールを
+     * currentConfig に従って設定する
+     *
+     * - autoScale = true  : Plotly に任せる
+     * - autoScale = false : min/max を固定
+     */
+    function applySpectrogramScale() {
+        const panel = panels.find(p => p.type === "spectrogram");
+        if (!panel) return;
+
+        if (currentConfig.autoScale) {
+            Plotly.restyle(panel.divId, {
+                zmin: null,
+                zmax: null
+            }, [0]);
+        } else {
+            Plotly.restyle(panel.divId, {
+                zmin: currentConfig.minAmplitudeInput,
+                zmax: currentConfig.maxAmplitudeInput
+            }, [0]);
+        }
+    }
+
 
     /**
      * 2次元配列を転置する

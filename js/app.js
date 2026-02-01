@@ -36,7 +36,7 @@ const DEFAULT_CONFIG = {
     // ディスプレイ
     graphType: 'fftWaterfall',
     autoScale: false,
-    dbDisplay: false,
+    dbDisplay: true,
     freqLog:   true,
     maxAmplitudeInput: 100,
     minAmplitudeInput: 0,
@@ -49,7 +49,7 @@ const DEFAULT_CONFIG = {
     fftWindow: 'Hanning',
     fftSize: 1024,
     // アプリ
-    dbCorrectionGain: 0.0
+    dbCorrectionGain: 100.0
 };
 
 /* ====================================================
@@ -66,7 +66,7 @@ const CONFIG_UI_MAP = {
     freqLog:          { type: "checkbox", id: "freqLog" },
 
     maxAmplitudeInput:{ type: "number",   id: "maxAmplitudeInput" },
-    minAmplitudeInput:{ type: "number",   id: "mimAmplitudeInput" },
+    minAmplitudeInput:{ type: "number",   id: "minAmplitudeInput" },
     recordDurationSec:{ type: "number",   id: "recordDurationSec" },
 
     autoScrollMode:   { type: "checkbox", id: "autoScrollMode" },
@@ -189,7 +189,9 @@ function initializeApp() {
         currentConfig = saved;
     } else {
         // 保存が無ければデフォルト設定を使用
-        currentConfig = structuredClone(DEFAULT_CONFIG);
+        ConfigManager.apply(structuredClone(DEFAULT_CONFIG));
+        currentConfig = ConfigManager.get();
+
         saveConfigToStorage(currentConfig);
     }
 
@@ -247,7 +249,8 @@ function applySettings() {
     const newConfig = readConfigFromUI();
 
     // 正式設定として更新
-    currentConfig = newConfig;
+    ConfigManager.apply(newConfig);
+    currentConfig = ConfigManager.get();
 
     // 永続化
     saveConfigToStorage(currentConfig);
@@ -375,7 +378,7 @@ function readConfigFromUI() {
  */
 function applyConfigToSystem() {
     ConfigManager.apply(currentConfig);
-    GraphManager.applyConfig(currentConfig);
+    GraphManager.applyConfig(ConfigManager.get());
 }
 
 
@@ -400,7 +403,8 @@ function loadConfigFromStorage() {
     if (!json) return null;
 
     try {
-        return JSON.parse(json);
+        const parsed = JSON.parse(json);
+        return { ...DEFAULT_CONFIG, ...parsed };
     } catch (e) {
         console.warn("設定の読み込みに失敗しました。デフォルト設定を使用します。");
         return null;
@@ -420,6 +424,7 @@ btnStop.addEventListener("click", stopMeasurement);
 
 async function startMeasurement() {
     await MeasurementController.start();
+    applyConfigToSystem();
     GraphManager.resetAxes();
     GraphManager.start();
 
