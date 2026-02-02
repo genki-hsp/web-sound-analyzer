@@ -47,7 +47,7 @@ const DEFAULT_CONFIG = {
     // FFT
     samplingRate: 44100,
     fftWindow: 'Hanning',
-    fftSize: 1024,
+    fftSize: 2048,
     // アプリ
     dbCorrectionGain: 100.0
 };
@@ -114,16 +114,8 @@ const CONFIG_UI_MAP = {
     },
 
     fftSize: {
-        type: "radio",
-        name: "fftSize",
-        valueMap: {
-            fftSize1:  1024,
-            fftSize2:  2048,
-            fftSize4:  4096,
-            fftSize8:  8192,
-            fftSize16: 16384,
-            fftSize32: 32768
-        }
+        type: "select",
+        id: "fftSizeSelect"
     },
 
     // ===== アプリ =====

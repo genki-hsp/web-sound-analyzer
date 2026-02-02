@@ -21,6 +21,8 @@ class WebAudioSpectrumEngine {
 
         this.freqData = null;
         this.timeData = null;
+
+        this.currentSampleRate = null;
     }
 
     /**
@@ -29,7 +31,7 @@ class WebAudioSpectrumEngine {
      *
      * @returns {Promise<void>}
      */
-    async init() {
+    async init(sampleRate = 44100) {
         /*
          * [接続図]
          *
@@ -46,10 +48,10 @@ class WebAudioSpectrumEngine {
         this.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
         this.audioContext = new AudioContext({
-//            sampleRate: 96000,
-            sampleRate: 44100,
+            sampleRate: sampleRate,
             sinkId: {type: 'none'} // 音を再生しない
         });
+        this.currentSampleRate = this.audioContext.sampleRate;
 
         const source = this.audioContext.createMediaStreamSource(this.mediaStream);
 
@@ -57,15 +59,66 @@ class WebAudioSpectrumEngine {
         this.analyser = this.audioContext.createAnalyser();
 
         // 最低限の初期設定
-        this.analyser.fftSize = 1024;   // 後で config で変更されます。
         this.analyser.smoothingTimeConstant = 0;
         // this.analyser.minDecibels = -100
 
         source.connect(this.analyser);
 
+        // バッファ確保
+        this._reallocBuffers();
+    }
+
+    /**
+     * バッファ再確保
+     * @private
+     */
+    _reallocBuffers() {
         // 出力先を確保
         this.freqData = new Float32Array(this.analyser.frequencyBinCount);
         this.timeData = new Float32Array(this.analyser.fftSize);
+    }
+
+    /**
+     * FFTサイズ設定
+     * @param {number} fftSize
+     */
+    setFftSize(fftSize) {
+        if (!this.analyser) return;
+        if (this.analyser.fftSize !== fftSize) {
+            this.analyser.fftSize = fftSize;
+            this._reallocBuffers();
+        }
+    }
+
+    /**
+     * サンプリング周波数設定（AudioContext 再生成）
+     * @param {number} sampleRate
+     */
+    async setSamplingRate(sampleRate) {
+        if (!this.audioContext) return;
+
+        if (this.currentSampleRate === sampleRate) return;
+
+        // 破棄
+        await this.destroy();
+
+        // 再初期化
+        await this.init(sampleRate);
+    }
+
+    /**
+     * FFT 関連設定を更新する
+     *
+     * @param {Object} config
+     */
+    async updateConfig(config) {
+        if (!this.audioContext) return;
+
+        // サンプリング周波数
+        await this.setSamplingRate(config.samplingRate);
+
+        // FFTサイズ
+        this.setFftSize(config.fftSize);
     }
 
     /**
@@ -210,7 +263,7 @@ const MeasurementController = (function () {
         state = "STARTING";
 
         engine = new WebAudioSpectrumEngine();
-        await engine.init();
+        await engine.init(currentConfig.samplingRate);
         engine.updateConfig(currentConfig);
 
         measurementStartTime = engine.getCurrentTime();
@@ -243,9 +296,9 @@ const MeasurementController = (function () {
      *
      * @param {Object} config
      */
-    function updateConfig(config) {
+    async function updateConfig(config) {
         if (!engine) return;
-        engine.updateConfig(config);
+        await engine.updateConfig(config);
 
         // FFT フレーム更新周期（hop）
         const fftSize = config.fftSize;
@@ -522,7 +575,6 @@ const GraphManager = (function () {
             if ('yaxis.range[0]' in event && 'yaxis.range[1]' in event) {
                 currentConfig.minAmplitudeInput = event['yaxis.range[0]'];
                 currentConfig.maxAmplitudeInput = event['yaxis.range[1]'];
-                //notifyConfigChanged(currentConfig);
                 applySpectrogramScale();
             }
 
@@ -530,9 +582,24 @@ const GraphManager = (function () {
             if ('scene.zaxis.range[0]' in event && 'scene.zaxis.range[1]' in event) {
                 currentConfig.minDb = event['scene.zaxis.range[0]'];
                 currentConfig.maxDb = event['scene.zaxis.range[1]'];
-                //notifyConfigChanged(currentConfig);
             }
         });
+    }
+
+    /**
+     * 設定変更通知
+     *
+     * @param {Object} config
+     * 
+     * 以下のような変更があった場合に使います。
+     * - FFTサイズ変更
+     * - サンプリング周波数変更
+     * - カラーマップ変更
+     * - autoscale ON/OFF
+     */
+    async function notifyConfigChanged(config) {
+        currentConfig = config;
+        await applyConfig(config);
     }
 
     /**
@@ -714,7 +781,7 @@ const GraphManager = (function () {
      *
      * @param {Object} config
      */
-    function applyConfig(config) {
+    async function applyConfig(config) {
         // graphType → graph1 / graph2 対応表
         const graphTypeMap = {
             fftWaterfall:   ["fft",         "waterfall"],
@@ -786,8 +853,9 @@ const GraphManager = (function () {
             }
 
             Plotly.relayout(panel.divId, layoutUpdate);
-            applySpectrogramScale();
         });
+        applySpectrogramScale();
+        await MeasurementController.updateConfig(config);
     }
 
     /**
@@ -1005,8 +1073,8 @@ const GraphManager = (function () {
             case "spectrogram":
                 return {
                     title: { text: "Spectrogram" },
-                    xaxis: { title: { text: "Time [s]" } },
-                    yaxis: { title: { text: "Frequency [Hz]" } },
+                    xaxis: { title: { text: "Time (s)" } },
+                    yaxis: { title: { text: "Frequency (Hz)" } },
                     margin: { t: 40, l: 60, r: 20, b: 40 },
                     uirevision: "spectrogram"
                 };
@@ -1014,7 +1082,7 @@ const GraphManager = (function () {
             case "fft":
                 return {
                     title: { text: "FFT Spectrum" },
-                    xaxis: { title: { text: "Frequency [Hz]" } },
+                    xaxis: { title: { text: "Frequency (Hz)" } },
                     yaxis: { title: { text: "Amplitude" } },
                     margin: { t: 40, l: 60, r: 20, b: 40 },
                     uirevision: "fft"
@@ -1023,7 +1091,7 @@ const GraphManager = (function () {
             case "waveform":
                 return {
                     title: { text: "Waveform" },
-                    xaxis: { title: { text: "Time [s]" } },
+                    xaxis: { title: { text: "Time (s)" } },
                     yaxis: { title: { text: "Amplitude" } },
                     margin: { t: 40, l: 60, r: 20, b: 40 },
                     uirevision: "waveform"
@@ -1033,7 +1101,7 @@ const GraphManager = (function () {
                 return {
                     title: { text: "Waterfall" },
                     scene: {
-                        xaxis: { title: { text: "Frequency [Hz]" } },
+                        xaxis: { title: { text: "Frequency (Hz)" } },
                         yaxis: { title: { text: "Time" } },
                         zaxis: { title: { text: "Amplitude" } },
                         camera: {
