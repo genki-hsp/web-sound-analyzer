@@ -126,20 +126,6 @@ class WebAudioSpectrumEngine {
         return axis;
     }
 
-
-    /**
-     * FFT 関連設定を更新する
-     *
-     * @param {Object} config
-     */
-    updateConfig(config) {
-        if (!this.analyser) return;
-        this.analyser.fftSize = config.fftSize;
-        // 出力先を再確保
-        this.freqData = new Float32Array(this.analyser.frequencyBinCount);
-        this.timeData = new Float32Array(this.analyser.fftSize);
-    }
-
     /**
      * 時間
      */
