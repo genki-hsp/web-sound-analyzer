@@ -814,31 +814,39 @@ const GraphManager = (function () {
             let layoutUpdate = {};
 
             if (panel.type === "spectrogram") {
-                layoutUpdate = {
-                    //xaxis:        { autorange: true },
-                    yaxis: auto 
-                        ? { autorange: true } 
-                        : { autorange: false, range: FIXED_FREQ_RANGE }
-                };
+                layoutUpdate = auto
+                    ? {
+                        "yaxis.autorange": true
+                    }
+                    : {
+                        "yaxis.autorange": false,
+                        "yaxis.range": FIXED_FREQ_RANGE
+                    };
             }
 
             if (panel.type === "fft") {
-                layoutUpdate = {
-                    xaxis: auto 
-                        ? { autorange: true } 
-                        : { autorange: false, range: FIXED_FREQ_RANGE },
-                    yaxis: auto 
-                        ? { autorange: true } 
-                        : { autorange: false, range: [config.minAmplitudeInput, config.maxAmplitudeInput] }
-                };
+                layoutUpdate = auto
+                    ? {
+                        "xaxis.autorange": true,
+                        "yaxis.autorange": true
+                    }
+                    : {
+                        "xaxis.autorange": false,
+                        "xaxis.range": FIXED_FREQ_RANGE,
+                        "yaxis.autorange": false,
+                        "yaxis.range": [config.minAmplitudeInput, config.maxAmplitudeInput]
+                    };
             }
 
             if (panel.type === "waveform") {
-                layoutUpdate = {
-                    yaxis: auto 
-                        ? { autorange: true } 
-                        : { autorange: false, range: [-1, 1] }
-                };
+                layoutUpdate = auto
+                    ? {
+                        "yaxis.autorange": true
+                    }
+                    : {
+                        "yaxis.autorange": false,
+                        "yaxis.range": [-1, 1]
+                    };
             }
 
             if (panel.type === "waterfall") {
