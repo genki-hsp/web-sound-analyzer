@@ -568,21 +568,33 @@ const GraphManager = (function () {
         });
 
         div.on('plotly_relayout', (event) => {
+            // FFT以外は、将来の拡張時のためにコメントで残しています。
+            
             // オートスケールOFFのときだけ処理
             if (currentConfig.autoScale) return;
             
-            // FFT / 波形 用（2D）
-            if ('yaxis.range[0]' in event && 'yaxis.range[1]' in event) {
-                currentConfig.minAmplitudeInput = event['yaxis.range[0]'];
-                currentConfig.maxAmplitudeInput = event['yaxis.range[1]'];
-                applySpectrogramScale();
+            // 波形
+            // if (panel.type === "waveform") {
+            // }
+
+            // FFT
+            if (panel.type === "fft") {
+                // 振幅レンジ
+                if ('yaxis.range[0]' in event && 'yaxis.range[1]' in event) {
+                    currentConfig.minAmplitudeInput = event['yaxis.range[0]'];
+                    currentConfig.maxAmplitudeInput = event['yaxis.range[1]'];
+                    applySpectrogramScale();
+                }
             }
 
-            // Waterfall（3D）
-            if ('scene.zaxis.range[0]' in event && 'scene.zaxis.range[1]' in event) {
-                currentConfig.minDb = event['scene.zaxis.range[0]'];
-                currentConfig.maxDb = event['scene.zaxis.range[1]'];
-            }
+            // スペクトログラム
+            // if (panel.type === "spectrogram") {
+            // }
+
+            // Waterfall
+            // if (panel.type === "waterfall") {
+            // }
+
         });
     }
 
