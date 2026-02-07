@@ -466,6 +466,8 @@ const GraphManager = (function () {
      *      timeAxis 計算の基準時刻として使用。
      * @property {Float32Array[]} waterfallFrames
      *      waterfall 用スペクトル履歴
+     * @property {Float32Array[]} waterfallTimes
+     *      waterfall 用経過時間
      */
 
     /** @type {GraphPanel[]} */
@@ -477,9 +479,6 @@ const GraphManager = (function () {
     let isRunning   = false;
     let animationId = null;
 
-    // スペクトログラムバッファ
-    const MAX_TIME_FRAMES = 200;
-    
     /**
      * 指定したグラフパネルの表示種別を変更する
      *
@@ -535,6 +534,7 @@ const GraphManager = (function () {
         panel.spectrogram = [];
         panel.timeAxis    = [];
         panel.waterfallFrames = [];
+        panel.waterfallTimes  = [];
         panel.measurementStartTime = 0;
 
         clearPanel(panel);
@@ -569,7 +569,7 @@ const GraphManager = (function () {
 
         div.on('plotly_relayout', (event) => {
             // FFT以外は、将来の拡張時のためにコメントで残しています。
-            
+
             // オートスケールOFFのときだけ処理
             if (currentConfig.autoScale) return;
             
@@ -970,18 +970,17 @@ const GraphManager = (function () {
      * @param {Float32Array} spectrum
      */
     function updateSpectrogram(panel, spectrum) {
-        // 振幅データ作成
-        // dB配列を通常配列へ変換
-        panel.spectrogram.push(Array.from(spectrum));
-        if (panel.spectrogram.length > MAX_TIME_FRAMES) {
-            panel.spectrogram.shift();
-        }
-
-        // 時間軸データ作成
         const timeSec = (performance.now() - panel.measurementStartTime) / 1000;
+        const minTime = timeSec - currentConfig.recordDurationSec;
+
+        // データ追加
         panel.timeAxis.push(timeSec);
-        if (panel.timeAxis.length > MAX_TIME_FRAMES) {
+        panel.spectrogram.push(Array.from(spectrum));
+
+        // 古いデータを削除
+        while (panel.timeAxis.length > 0 && panel.timeAxis[0] < minTime) {
             panel.timeAxis.shift();
+            panel.spectrogram.shift();
         }
 
         // spectrogram : [time][freq] → [freq][time]
@@ -1025,7 +1024,6 @@ const GraphManager = (function () {
     }
 
     let waterfallDrawCounter = 0
-    const MAX_WATERFALL_FRAMES = 80;
     /**
      * ウォーターフォール更新
      *
@@ -1035,14 +1033,23 @@ const GraphManager = (function () {
     function updateWaterfall(panel, spectrum) {
         if (!panel.waterfallFrames) {
             panel.waterfallFrames = [];
+            panel.waterfallTimes = [];
         }
 
-        // フレーム保存
+        const timeSec = (performance.now() - panel.measurementStartTime) / 1000;
+        const minTime = timeSec - currentConfig.recordDurationSec;
+
+        // 追加
         panel.waterfallFrames.push(spectrum.slice());
-        if (panel.waterfallFrames.length > MAX_WATERFALL_FRAMES) {
+        panel.waterfallTimes.push(timeSec);
+
+        // 古いデータを削除
+        while (panel.waterfallTimes.length > 0 && panel.waterfallTimes[0] < minTime) {
+            panel.waterfallTimes.shift();
             panel.waterfallFrames.shift();
         }
 
+        // 描画間引き
         waterfallDrawCounter++;
         if (waterfallDrawCounter % 3 !== 0) return;
 
@@ -1054,7 +1061,7 @@ const GraphManager = (function () {
                 type: "scatter3d",
                 mode: "lines",
                 x: freqAxis,
-                y: Array(freqAxis.length).fill(i),
+                y: Array(freqAxis.length).fill(panel.waterfallTimes[i]),
                 z: frame,
                 line: {
                     width: 2,
@@ -1122,7 +1129,7 @@ const GraphManager = (function () {
                     title: { text: "Waterfall" },
                     scene: {
                         xaxis: { title: { text: "Frequency (Hz)" } },
-                        yaxis: { title: { text: "Time" } },
+                        yaxis: { title: { text: "Time (s)" } },
                         zaxis: { title: { text: "Amplitude" } },
                         camera: {
                             eye: { x: 1.6, y: -1.8, z: 1.2 }  // 斜め上から
