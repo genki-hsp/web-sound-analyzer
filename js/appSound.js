@@ -478,6 +478,7 @@ const GraphManager = (function () {
 
     let isRunning   = false;
     let animationId = null;
+    let isSyncingFrequency = false;
 
     /**
      * 指定したグラフパネルの表示種別を変更する
@@ -570,30 +571,45 @@ const GraphManager = (function () {
         div.on('plotly_relayout', (event) => {
             // FFT以外は、将来の拡張時のためにコメントで残しています。
 
-            // オートスケールOFFのときだけ処理
-            if (currentConfig.autoScale) return;
-            
-            // 波形
-            // if (panel.type === "waveform") {
-            // }
+            // 同期処理中なら無視（無限ループ防止）
+            if (isSyncingFrequency) return;
+
+            let fMin, fMax;
 
             // FFT
             if (panel.type === "fft") {
+                if ('xaxis.range[0]' in event && 'xaxis.range[1]' in event) {
+                    fMin = event['xaxis.range[0]'];
+                    fMax = event['xaxis.range[1]'];
+                }
                 // 振幅レンジ
-                if ('yaxis.range[0]' in event && 'yaxis.range[1]' in event) {
-                    currentConfig.minAmplitudeInput = event['yaxis.range[0]'];
-                    currentConfig.maxAmplitudeInput = event['yaxis.range[1]'];
-                    applySpectrogramScale();
+                if (!currentConfig.autoScale) {
+                    if ('yaxis.range[0]' in event && 'yaxis.range[1]' in event) {
+                        currentConfig.minAmplitudeInput = event['yaxis.range[0]'];
+                        currentConfig.maxAmplitudeInput = event['yaxis.range[1]'];
+                        applySpectrogramScale();
+                    }
                 }
             }
 
-            // スペクトログラム
-            // if (panel.type === "spectrogram") {
-            // }
+            // spectrogram（周波数は y 軸）
+            if (panel.type === "spectrogram") {
+                if ('yaxis.range[0]' in event && 'yaxis.range[1]' in event) {
+                    fMin = event['yaxis.range[0]'];
+                    fMax = event['yaxis.range[1]'];
+                }
+            }
 
-            // Waterfall
-            // if (panel.type === "waterfall") {
-            // }
+            // waterfall（3D）
+            if (panel.type === "waterfall") {
+                if ('scene.xaxis.range[0]' in event && 'scene.xaxis.range[1]' in event) {
+                    fMin = event['scene.xaxis.range[0]'];
+                    fMax = event['scene.xaxis.range[1]'];
+                }
+            }
+
+            if (fMin === undefined || fMax === undefined) return;
+            syncFrequencyRangeToAllPlots(fMin, fMax);
 
         });
     }
@@ -820,31 +836,44 @@ const GraphManager = (function () {
         // オートスケール
         const auto = config.autoScale === true;
 
+        // 周波数
+        let freqAxis = MeasurementController.getFrequencyAxis();
+        if (!freqAxis || freqAxis.length < 2){ freqAxis = [0, 20000];}
+        let fMin = freqAxis[0];
+        let fMax = freqAxis[freqAxis.length - 1];
+
+        const freqLog = config.freqLog;
+        if (freqLog){
+            fMin = Math.max(fMin, 1e-3);
+            fMin = Math.log10(fMin);
+            fMax = Math.log10(fMax);
+        }
+
         panels.forEach(panel => {
             if (panel.type === "empty") return;
 
             let layoutUpdate = {};
 
             if (panel.type === "spectrogram") {
-                layoutUpdate = auto
-                    ? {
-                        "yaxis.autorange": true
-                    }
-                    : {
+                layoutUpdate = {
+                        "yaxis.type": freqLog ? "log" : "linear",
                         "yaxis.autorange": false,
-                        "yaxis.range": FIXED_FREQ_RANGE
+                        "yaxis.range": [fMin, fMax]
                     };
             }
 
             if (panel.type === "fft") {
                 layoutUpdate = auto
                     ? {
-                        "xaxis.autorange": true,
+                        "xaxis.type": freqLog ? "log" : "linear",
+                        "xaxis.autorange": false,
+                        "xaxis.range": [fMin, fMax],
                         "yaxis.autorange": true
                     }
                     : {
+                        "xaxis.type": freqLog ? "log" : "linear",
                         "xaxis.autorange": false,
-                        "xaxis.range": FIXED_FREQ_RANGE,
+                        "xaxis.range": [fMin, fMax],
                         "yaxis.autorange": false,
                         "yaxis.range": [config.minAmplitudeInput, config.maxAmplitudeInput]
                     };
@@ -863,8 +892,9 @@ const GraphManager = (function () {
 
             if (panel.type === "waterfall") {
                 layoutUpdate = {
-                    "scene.xaxis.autorange": auto,
-                    "scene.xaxis.range": auto ? undefined : FIXED_FREQ_RANGE,
+                    "scene.xaxis.type": freqLog ? "log" : "linear",
+                    "scene.xaxis.autorange": false,
+                    "scene.xaxis.range": [fMin, fMax],
                     "scene.zaxis.autorange": auto,
                     "scene.zaxis.range": auto 
                         ? undefined 
@@ -1096,12 +1126,29 @@ const GraphManager = (function () {
      * @returns {Object} Plotly layout
      */
     function buildLayout(type) {
+        let freqAxis = MeasurementController.getFrequencyAxis();
+        if (!freqAxis || freqAxis.length < 2){ freqAxis = [0, 20000];}
+        let fMin = freqAxis[0];
+        let fMax = freqAxis[freqAxis.length - 1];
+
+        const freqLog = currentConfig.freqLog;
+        if (freqLog){
+            fMin = Math.max(fMin, 1e-3);
+            fMin = Math.log10(fMin);
+            fMax = Math.log10(fMax);
+        }
+
         switch (type) {
             case "spectrogram":
                 return {
                     title: { text: "Spectrogram" },
                     xaxis: { title: { text: "Time (s)" } },
-                    yaxis: { title: { text: "Frequency (Hz)" } },
+                    yaxis: { 
+                        title: { text: "Frequency (Hz)" } ,
+                        type: freqLog ? 'log' : 'linear',
+                        autorange: false,
+                        range: [fMin, fMax]
+                    },
                     margin: { t: 40, l: 60, r: 20, b: 40 },
                     uirevision: "spectrogram"
                 };
@@ -1109,7 +1156,12 @@ const GraphManager = (function () {
             case "fft":
                 return {
                     title: { text: "FFT Spectrum" },
-                    xaxis: { title: { text: "Frequency (Hz)" } },
+                    xaxis: { 
+                        title: { text: "Frequency (Hz)" },
+                        type: freqLog ? 'log' : 'linear',
+                        autorange: false,
+                        range: [fMin, fMax]
+                    },
                     yaxis: { title: { text: "Amplitude" } },
                     margin: { t: 40, l: 60, r: 20, b: 40 },
                     uirevision: "fft"
@@ -1128,7 +1180,12 @@ const GraphManager = (function () {
                 return {
                     title: { text: "Waterfall" },
                     scene: {
-                        xaxis: { title: { text: "Frequency (Hz)" } },
+                        xaxis: {
+                            title: { text: "Frequency (Hz)" },
+                            type: freqLog ? 'log' : 'linear',
+                            autorange: false,
+                            range: [fMin, fMax]
+                        },
                         yaxis: { title: { text: "Time (s)" } },
                         zaxis: { title: { text: "Amplitude" } },
                         camera: {
@@ -1167,6 +1224,40 @@ const GraphManager = (function () {
                 zmax: currentConfig.maxAmplitudeInput
             }, [0]);
         }
+    }
+
+    /**
+     * 各グラフの周波数軸範囲を設定
+     * 
+     * @param {number} fMin - 設定する周波数の最小値（例: 0）
+     * @param {number} fMax - 設定する周波数の最大値（例: 20000）
+     */
+    function syncFrequencyRangeToAllPlots(fMin, fMax) {
+        isSyncingFrequency = true;
+
+        panels.forEach(panel => {
+            if (panel.type === "spectrogram") {
+                Plotly.relayout(panel.divId, {
+                    "yaxis.autorange": false,
+                    "yaxis.range": [fMin, fMax]
+                });
+            }
+
+            if (panel.type === "waterfall") {
+                Plotly.relayout(panel.divId, {
+                    "scene.xaxis.autorange": false,
+                    "scene.xaxis.range": [fMin, fMax]
+                });
+            }
+
+            if (panel.type === "fft") {
+                Plotly.relayout(panel.divId,{
+                    "xaxis.autorange": false,
+                    "xaxis.range":  [fMin, fMax]
+                });
+            }
+        });
+        isSyncingFrequency = false;
     }
 
 
