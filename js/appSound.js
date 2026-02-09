@@ -21,6 +21,7 @@ class WebAudioSpectrumEngine {
 
         this.freqData = null;
         this.timeData = null;
+        this.linearBuffer = null;
 
         this.currentSampleRate = null;
     }
@@ -74,8 +75,9 @@ class WebAudioSpectrumEngine {
      */
     _reallocBuffers() {
         // 出力先を確保
-        this.freqData = new Float32Array(this.analyser.frequencyBinCount);
-        this.timeData = new Float32Array(this.analyser.fftSize);
+        this.freqData     = new Float32Array(this.analyser.frequencyBinCount);
+        this.linearBuffer = new Float32Array(this.analyser.frequencyBinCount);
+        this.timeData     = new Float32Array(this.analyser.fftSize);
     }
 
     /**
@@ -126,14 +128,33 @@ class WebAudioSpectrumEngine {
      *
      * MeasurementController から周期的に呼ばれる
      *
+     * @param {"db"|"linear"} mode
      * @returns {Float32Array}
      *   - 周波数ビン配列（dB値）
      */
-    getSpectrum() {
+    getSpectrum(mode = "db") {
         if (!this.analyser) return null;
 
+        const MIN_DB = -120;
+
         this.analyser.getFloatFrequencyData(this.freqData);
-        return this.freqData;
+
+        // -Infinity対策
+        for (let i = 0; i < this.freqData.length; i++) {
+            if (!Number.isFinite(this.freqData[i])) {
+                this.freqData[i] = MIN_DB;
+            }
+        }
+
+        if (mode === "db") {
+            return this.freqData;
+        } else {
+            // linearに変換
+            for (let i = 0; i < this.freqData.length; i++) {
+                this.linearBuffer[i] = Math.pow(10, this.freqData[i] / 20);
+            }
+            return this.linearBuffer;
+        }
     }
 
     /**
@@ -380,9 +401,18 @@ const MeasurementController = (function () {
         // FFT
         // デシベルの補正ゲインで補正。
         // 本来ならデバイスごとに異なるマイクの補正ゲインで補正すべきだが、今回は省略。
-        const raw = engine.getSpectrum();
+        const raw = engine.getSpectrum(
+            currentConfig.dbDisplay ? "db" : "linear"
+        );
         if (!raw) return;
-        latestSpectrum = applyDbOffset(raw, currentConfig.dbCorrectionGain);    // 補正
+        
+        // 補正
+        if (currentConfig.dbDisplay) {
+            latestSpectrum = applyDbOffset(raw, currentConfig.dbCorrectionGain);
+        } else {
+            latestSpectrum = applyLinearGain(raw, currentConfig.dbCorrectionGain);
+        }
+
         // 波形, 時間軸（FFT）
         latestWaveform = engine.getWaveform();
         latestTimeSec  = engine.getCurrentTime() - measurementStartTime;
@@ -400,6 +430,23 @@ const MeasurementController = (function () {
         const out = new Float32Array(rawSpectrum.length);
         for (let i = 0; i < rawSpectrum.length; i++) {
             out[i] = rawSpectrum[i] + offsetDb;
+        }
+        return out;
+    }
+
+    /**
+     * リニア値の配列を指定値で増幅する
+     * リニア値の配列にoffsetDbで増幅します。
+     * 
+     * @param {*} rawSpectrum 
+     * @param {*} offsetDb 
+     * @returns 
+     */
+    function applyLinearGain(rawSpectrum, offsetDb) {
+        const gain = Math.pow(10, offsetDb / 20); // dB → 倍率
+        const out = new Float32Array(rawSpectrum.length);
+        for (let i = 0; i < rawSpectrum.length; i++) {
+            out[i] = rawSpectrum[i] * gain;
         }
         return out;
     }
@@ -837,6 +884,7 @@ const GraphManager = (function () {
         const auto = config.autoScale === true;
 
         // 周波数
+        // LOGとリニアの切り替え
         let freqAxis = MeasurementController.getFrequencyAxis();
         if (!freqAxis || freqAxis.length < 2){ freqAxis = [0, 20000];}
         let fMin = freqAxis[0];
@@ -1126,6 +1174,15 @@ const GraphManager = (function () {
      * @returns {Object} Plotly layout
      */
     function buildLayout(type) {
+
+        // 振幅のラベル
+        // デシベルとリニアの切り替え処理
+        const ampLabel = currentConfig.dbDisplay
+            ? "Amplitude (dB)"
+            : "Amplitude (linear)";
+
+        // 周波数軸
+        // LOGとリニアの切り替え処理
         let freqAxis = MeasurementController.getFrequencyAxis();
         if (!freqAxis || freqAxis.length < 2){ freqAxis = [0, 20000];}
         let fMin = freqAxis[0];
@@ -1162,7 +1219,7 @@ const GraphManager = (function () {
                         autorange: false,
                         range: [fMin, fMax]
                     },
-                    yaxis: { title: { text: "Amplitude" } },
+                    yaxis: { title: { text: ampLabel } },
                     margin: { t: 40, l: 60, r: 20, b: 40 },
                     uirevision: "fft"
                 };
@@ -1187,7 +1244,7 @@ const GraphManager = (function () {
                             range: [fMin, fMax]
                         },
                         yaxis: { title: { text: "Time (s)" } },
-                        zaxis: { title: { text: "Amplitude" } },
+                        zaxis: { title: { text: ampLabel } },
                         camera: {
                             eye: { x: 1.6, y: -1.8, z: 1.2 }  // 斜め上から
                         }
