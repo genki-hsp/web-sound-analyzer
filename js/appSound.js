@@ -46,11 +46,19 @@ class WebAudioSpectrumEngine {
          */
 
         // 音源（マイク）
-        this.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        this.mediaStream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+                echoCancellation: false,   // エコーキャンセル
+                noiseSuppression: false,   // ノイズ抑制
+                autoGainControl: false,    // 自動ゲイン調整
+                channelCount: 1            // モノラル
+            },
+            video: false
+        });
 
         this.audioContext = new AudioContext({
             sampleRate: sampleRate,
-            sinkId: {type: 'none'} // 音を再生しない
+            latencyHint: "interactive"
         });
         this.currentSampleRate = this.audioContext.sampleRate;
 
