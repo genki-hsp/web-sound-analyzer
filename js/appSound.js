@@ -697,7 +697,7 @@ const GraphManager = (function () {
             z: [],  // [freq][time]
             x: [],  // time axis
             y: freqAxis,  // frequency axis
-            colorscale: "Jet"
+            colorscale: getPlotlyColorScale(currentConfig.colorScale)
         };
 
         Plotly.newPlot(
@@ -710,6 +710,32 @@ const GraphManager = (function () {
             }
         );
     }
+
+    /**
+     * スペクトログラムの初期化
+     * @param {"Standard"|"Green"|"White"} name
+     */
+    function getPlotlyColorScale(name) {
+        switch (name) {
+            case "Standard":
+                return "Jet";
+
+            case "Green":
+                // 黒 → 緑
+                return [
+                    [0.0, "rgb(0,0,0)"],
+                    [1.0, "rgb(0,255,0)"]
+                ];
+
+            case "White":
+                // 黒 → 白
+                return "Greys";
+
+            default:
+                return "Jet";
+        }
+    }
+
 
     /**
      * FFTの初期化
@@ -777,9 +803,9 @@ const GraphManager = (function () {
             line: {
                 width: 2,
                 color: [],
-                colorscale: "Jet",
-                cmin: 120,
-                cmax: 0
+                colorscale: getPlotlyColorScale(currentConfig.colorScale),
+                cmin: currentConfig.minAmplitudeInput,
+                cmax: currentConfig.maxAmplitudeInput
             }
         };
 
@@ -1072,7 +1098,8 @@ const GraphManager = (function () {
         // spectrogram : [time][freq] → [freq][time]
         Plotly.restyle(panel.divId, {
             z: [transpose(panel.spectrogram)],
-            x: [panel.timeAxis]
+            x: [panel.timeAxis],
+            colorscale: [getPlotlyColorScale(currentConfig.colorScale)]
         }, [0]);
     }
 
@@ -1152,7 +1179,7 @@ const GraphManager = (function () {
                 line: {
                     width: 2,
                     color: frame,
-                    colorscale: "Jet",
+                    colorscale: getPlotlyColorScale(currentConfig.colorScale),
                     cmin: auto ? undefined : currentConfig.minAmplitudeInput,
                     cmax: auto ? undefined : currentConfig.maxAmplitudeInput
                 },
