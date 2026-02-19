@@ -1283,7 +1283,8 @@ const GraphManager = (function () {
                         yaxis: { title: { text: "Time (s)" } },
                         zaxis: { title: { text: ampLabel } },
                         camera: {
-                            eye: { x: 1.6, y: -1.8, z: 1.2 }  // 斜め上から
+                            projection: { type: 'orthographic' },  // パースをなくす設定
+                            eye: { x: 0.5, y: -1.5, z: 1.2 }  // 斜め上から
                         }
                     },
                     uirevision: "waterfall",
