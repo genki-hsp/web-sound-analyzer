@@ -926,7 +926,7 @@ const GraphManager = (function () {
 
         const freqLog = config.freqLog;
         if (freqLog){
-            fMin = Math.max(fMin, 1e-3);
+            fMin = freqAxis[1];
             fMin = Math.log10(fMin);
             fMax = Math.log10(fMax);
         }
@@ -1225,10 +1225,12 @@ const GraphManager = (function () {
 
         const freqLog = currentConfig.freqLog;
         if (freqLog){
-            fMin = Math.max(fMin, 1e-3);
+            fMin = freqAxis[1];
             fMin = Math.log10(fMin);
             fMax = Math.log10(fMax);
         }
+        fMin = 40;
+        fMax = 10000;
 
         switch (type) {
             case "spectrogram":
