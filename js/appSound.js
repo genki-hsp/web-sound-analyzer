@@ -664,8 +664,25 @@ const GraphManager = (function () {
             }
 
             if (fMin === undefined || fMax === undefined) return;
-            syncFrequencyRangeToAllPlots(fMin, fMax);
 
+            // 周波数軸の最大レンジを実際の周波数データ範囲に合わせる
+            const freqAxis = MeasurementController.getFrequencyAxis();
+            if (!freqAxis || freqAxis.length < 2) return;
+
+            let linfMin = freqAxis[0];
+            let linfMax = freqAxis[freqAxis.length - 1];
+
+            if (currentConfig.freqLog) {
+                const logMin = Math.log10(freqAxis[1]);
+                const logMax = Math.log10(linfMax);
+                fMin = Math.max(fMin, logMin);
+                fMax = Math.min(fMax, logMax);
+            } else {
+                fMin = Math.max(fMin, linfMin);
+                fMax = Math.min(fMax, linfMax);
+            }
+
+            syncFrequencyRangeToAllPlots(fMin, fMax);
         });
     }
 
@@ -883,7 +900,6 @@ const GraphManager = (function () {
     }
 
 
-    const FIXED_FREQ_RANGE = [0, 10000];
     /**
      * 設定反映
      * graphType に応じて graph1 / graph2 を切り替える

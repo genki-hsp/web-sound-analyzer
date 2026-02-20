@@ -40,6 +40,8 @@ const DEFAULT_CONFIG = {
     freqLog:   true,
     maxAmplitudeInput: 100,
     minAmplitudeInput: 0,
+    freqMinInput: 0,
+    freqMaxInput: 20000,
     recordDurationSec: 60,
     colorScale: 'Standard',
     autoScrollMode: false,
@@ -67,6 +69,8 @@ const CONFIG_UI_MAP = {
 
     maxAmplitudeInput:{ type: "number",   id: "maxAmplitudeInput" },
     minAmplitudeInput:{ type: "number",   id: "minAmplitudeInput" },
+    freqMinInput:     { type: "number",   id: "freqMinInput" },
+    freqMaxInput:     { type: "number",   id: "freqMaxInput" },
     recordDurationSec:{ type: "number",   id: "recordDurationSec" },
 
     autoScrollMode:   { type: "checkbox", id: "autoScrollMode" },
