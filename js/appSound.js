@@ -666,7 +666,14 @@ const GraphManager = (function () {
             if (fMin === undefined || fMax === undefined) return;
 
             // 周波数軸の最大レンジを実際の周波数データ範囲に合わせる
-            const freqAxis = MeasurementController.getFrequencyAxis();
+            const range = buildFrequencyRange({
+                ...currentConfig,
+                freqMinInput: currentConfig.freqLog ? Math.pow(10,fMin) : fMin,
+                freqMaxInput: currentConfig.freqLog ? Math.pow(10,fMax) : fMax
+            });
+            syncFrequencyRangeToAllPlots(range.min, range.max);
+
+/*            const freqAxis = MeasurementController.getFrequencyAxis();
             if (!freqAxis || freqAxis.length < 2) return;
 
             let linfMin = freqAxis[0];
@@ -683,6 +690,7 @@ const GraphManager = (function () {
             }
 
             syncFrequencyRangeToAllPlots(fMin, fMax);
+            */
         });
     }
 
@@ -935,17 +943,9 @@ const GraphManager = (function () {
 
         // 周波数
         // LOGとリニアの切り替え
-        let freqAxis = MeasurementController.getFrequencyAxis();
-        if (!freqAxis || freqAxis.length < 2){ freqAxis = [0, 20000];}
-        let fMin = freqAxis[0];
-        let fMax = freqAxis[freqAxis.length - 1];
-
-        const freqLog = config.freqLog;
-        if (freqLog){
-            fMin = freqAxis[1];
-            fMin = Math.log10(fMin);
-            fMax = Math.log10(fMax);
-        }
+        const range = buildFrequencyRange(currentConfig);
+        const fMin = range.min;
+        const fMax = range.max;
 
         panels.forEach(panel => {
             if (panel.type === "empty") return;
@@ -1234,19 +1234,9 @@ const GraphManager = (function () {
 
         // 周波数軸
         // LOGとリニアの切り替え処理
-        let freqAxis = MeasurementController.getFrequencyAxis();
-        if (!freqAxis || freqAxis.length < 2){ freqAxis = [0, 20000];}
-        let fMin = freqAxis[0];
-        let fMax = freqAxis[freqAxis.length - 1];
-
-        const freqLog = currentConfig.freqLog;
-        if (freqLog){
-            fMin = freqAxis[1];
-            fMin = Math.log10(fMin);
-            fMax = Math.log10(fMax);
-        }
-        fMin = 40;
-        fMax = 10000;
+        const range = buildFrequencyRange(currentConfig);
+        const fMin = range.min;
+        const fMax = range.max;
 
         switch (type) {
             case "spectrogram":
@@ -1391,6 +1381,50 @@ const GraphManager = (function () {
             }
         }
         return result;
+    }
+
+    /**
+     * 周波数レンジ正規化
+     * 常に、実データの物理範囲を超えない周波数軸範囲を返します。
+     * config.freqLogが有効の場合は、Math.log10を返します。
+     * @param {Object} config 
+     * @returns { min: number, max: number }
+     */
+    function buildFrequencyRange(config) {
+        const freqAxis = MeasurementController.getFrequencyAxis();
+        if (!freqAxis || freqAxis.length < 2) {
+            if (config.freqLog) {
+                return { min: 0, max: Math.log10(20000) };
+            } else {
+                return { min: 0, max: 20000 };
+            }
+        }
+
+        const linMin = config.freqLog ? freqAxis[1] : freqAxis[0];
+        const linMax = freqAxis[freqAxis.length - 1];
+
+        let fMin = config.freqMinInput;
+        let fMax = config.freqMaxInput;
+
+        // 入力逆転防止
+        if (fMin > linMax) { fMin = linMin; }
+        if (fMax < linMin) { fMax = linMax; }
+
+        // 物理範囲で clamp
+        fMin = Math.max(fMin, linMin);
+        fMax = Math.min(fMax, linMax);
+        
+        if (config.freqLog) {
+            return {
+                min: Math.log10(fMin),
+                max: Math.log10(fMax)
+            };
+        } else {
+            return {
+                min: fMin,
+                max: fMax
+            };
+        }
     }
 
     return {
