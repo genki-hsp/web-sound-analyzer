@@ -672,25 +672,15 @@ const GraphManager = (function () {
                 freqMaxInput: currentConfig.freqLog ? Math.pow(10,fMax) : fMax
             });
             syncFrequencyRangeToAllPlots(range.min, range.max);
-
-/*            const freqAxis = MeasurementController.getFrequencyAxis();
-            if (!freqAxis || freqAxis.length < 2) return;
-
-            let linfMin = freqAxis[0];
-            let linfMax = freqAxis[freqAxis.length - 1];
-
+            // clamp後の値を currentConfig と UI に戻す
             if (currentConfig.freqLog) {
-                const logMin = Math.log10(freqAxis[1]);
-                const logMax = Math.log10(linfMax);
-                fMin = Math.max(fMin, logMin);
-                fMax = Math.min(fMax, logMax);
+                currentConfig.freqMinInput = Math.pow(10, range.min);
+                currentConfig.freqMaxInput = Math.pow(10, range.max);
             } else {
-                fMin = Math.max(fMin, linfMin);
-                fMax = Math.min(fMax, linfMax);
+                currentConfig.freqMinInput = range.min;
+                currentConfig.freqMaxInput = range.max;
             }
-
-            syncFrequencyRangeToAllPlots(fMin, fMax);
-            */
+            
         });
     }
 
@@ -938,14 +928,26 @@ const GraphManager = (function () {
         setGraph1Type(types[0]);
         setGraph2Type(types[1]);
 
-        // オートスケール
-        const auto = config.autoScale === true;
+        const auto    = config.autoScale === true;  // オートスケール
+        const freqLog = config.freqLog === true;    // 周波数軸LOG
 
         // 周波数
-        // LOGとリニアの切り替え
-        const range = buildFrequencyRange(currentConfig);
+        // 周波数レンジ正規化
+        const range = buildFrequencyRange(config);
         const fMin = range.min;
         const fMax = range.max;
+        // clamp後の値を currentConfig と UI に戻す
+        if (freqLog) {
+            config.freqMinInput = Math.pow(10, fMin);
+            config.freqMaxInput = Math.pow(10, fMax);
+            currentConfig.freqMinInput = config.freqMinInput;
+            currentConfig.freqMaxInput = config.freqMaxInput;
+        } else {
+            config.freqMinInput = fMin;
+            config.freqMaxInput = fMax;
+            currentConfig.freqMinInput = config.freqMinInput;
+            currentConfig.freqMaxInput = config.freqMaxInput;
+        }
 
         panels.forEach(panel => {
             if (panel.type === "empty") return;
