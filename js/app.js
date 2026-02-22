@@ -48,7 +48,7 @@ const DEFAULT_CONFIG = {
     autoPeakCursor: false,
     // FFT
     samplingRate: 44100,
-    fftWindow: 'Hanning',
+    fftWindow: 'Blackman',
     fftSize: 2048,
     // アプリ
     dbCorrectionGain: 100.0
