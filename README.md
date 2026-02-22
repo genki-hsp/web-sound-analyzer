@@ -33,7 +33,8 @@ Droid Dev.さんの『SoundAnalyser V4.2』がGoogle Playで入手できなく�
 
 ## 公開ページ
 
-GitHub Pages にて公開予定です。
+[GitHub Pages](https://genki-hsp.github.io/web-sound-analyzer/) にて公開しています。
+
 
 ## 使用ライブラリ
 
