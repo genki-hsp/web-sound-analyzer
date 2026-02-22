@@ -27,6 +27,17 @@ let currentAppState = "INIT";
  */
 let currentConfig = null;
 
+/* ====================================================
+   UI入力の直前正常値保持用
+==================================================== */
+
+/**
+ * 設定モーダル内での「直前の正常値」を保持する。
+ * 無効入力時のロールバック用。
+ *
+ * openSettings() 時に currentConfig から初期化される。
+ */
+let lastValidValues = null;
 
 /* ====================================================
    デフォルト設定
@@ -195,6 +206,9 @@ function initializeApp() {
     // 設定を各マネージャへ反映
     applyConfigToSystem();
 
+    // 入力値バリデーション管理
+    setupInputValidation();
+
     // グラフ描画処理を初期化
     GraphManager.init(document.getElementById("graph1"), currentConfig);
 }
@@ -233,6 +247,10 @@ function openSettings() {
 
     // 現在の設定をUIへ反映
     syncConfigToUI(currentConfig);
+
+    // 直前正常値を currentConfig で初期化
+    lastValidValues = structuredClone(currentConfig);
+
     settingsModal.show();
 }
 
@@ -365,6 +383,121 @@ function readConfigFromUI() {
 
 
 /* ====================================================
+   UI入力バリデーション管理
+==================================================== */
+
+/**
+ * 設定モーダル内の input / select に対して
+ * 入力値の正規化のみを行う。
+ *
+ * 注意:
+ * - currentConfig は変更しない
+ * - UI(value)を書き換えるだけ
+ * - 無効値は lastValidValues にロールバック
+ */
+function setupInputValidation() {
+
+    const freqMinEl = document.getElementById("freqMinInput");
+    const freqMaxEl = document.getElementById("freqMaxInput");
+    const samplingRateEl = document.getElementById("samplingRate");
+    const fftSizeEl = document.getElementById("fftSizeSelect");
+
+    // 周波数入力
+    freqMinEl.addEventListener("change", () => {
+        normalizeFrequencyInputsInUI();
+    });
+
+    freqMaxEl.addEventListener("change", () => {
+        normalizeFrequencyInputsInUI();
+    });
+
+    // FFT条件変更時も再正規化
+    samplingRateEl.addEventListener("change", () => {
+        normalizeFrequencyInputsInUI();
+    });
+
+    fftSizeEl.addEventListener("change", () => {
+        normalizeFrequencyInputsInUI();
+    });
+}
+
+/**
+ * UI上の freqMinInput / freqMaxInput を
+ * FFT条件（samplingRate / fftSize）に基づき正規化する。
+ *
+ * ・NaN / 無効入力 → lastValidValues にロールバック
+ * ・物理範囲 clamp
+ * ・逆転防止
+ *
+ * currentConfig は変更しない。
+ */
+function normalizeFrequencyInputsInUI() {
+
+    const minEl = document.getElementById("freqMinInput");
+    const maxEl = document.getElementById("freqMaxInput");
+
+    // UIの現在値から取得
+    const tmpConfig = readConfigFromUI();
+    let fMin = tmpConfig.freqMinInput;
+    let fMax = tmpConfig.freqMaxInput;
+    const sr = tmpConfig.samplingRate;
+    const fftSize = tmpConfig.fftSize;
+
+    const df = sr / fftSize; // 周波数分解能
+    const ny = sr / 2;       // ナイキスト周波数
+
+    // --- 無効値チェック（NaN / null / undefined）---
+    if (!Number.isFinite(fMin)) { rollbackInputs("freqMinInput"); return; }
+    if (!Number.isFinite(fMax)) { rollbackInputs("freqMaxInput"); return; }
+
+    const fftConditionChanged =
+        (sr !== lastValidValues.samplingRate) ||
+        (fftSize !== lastValidValues.fftSize);
+
+    if ((fMin != lastValidValues.freqMinInput) || fftConditionChanged){
+        // 物理範囲 → 関係制約 の順で補正
+        if (fMin < 0)  fMin = 0;
+        if (fMin >= fMax - df) {
+            fMin = Math.max(df, fMax - df);
+        }
+        // UIへ反映
+        minEl.value = fMin;
+    }
+    if ((fMax != lastValidValues.freqMaxInput) || fftConditionChanged){
+        // 物理範囲 → 関係制約 の順で補正
+        if (fMax > ny) fMax = ny;
+        if (fMax <= fMin + df ) {
+            fMax = fMin + df;
+        }
+        // UIへ反映
+        maxEl.value = fMax;
+    }
+   
+    // 正常値として保存
+    lastValidValues.samplingRate = sr;
+    lastValidValues.fftSize = fftSize;
+    lastValidValues.freqMinInput = fMin;
+    lastValidValues.freqMaxInput = fMax;
+}
+
+/**
+ * 指定した input 要素の値を lastValidValues に基づきロールバックする。
+ *
+ * @param {string} idname input要素のid（例: "freqMinInput"）
+ */
+function rollbackInputs(idname) {
+    const el = document.getElementById(idname);
+    if (!lastValidValues) return;
+    if (!el) return;
+    if (!(idname in lastValidValues)) return;
+
+    el.value = lastValidValues[idname];
+}
+
+
+
+
+/* ====================================================
    設定反映処理
 ==================================================== */
 
@@ -447,17 +580,4 @@ document.getElementById("settingsButton")
 
 document.getElementById("applySettings")
         .addEventListener("click", applySettings);
-
-
-
-/* ====================================================
-   計測エンジン
-==================================================== */
-// MeasurementController
-
-
-/* ====================================================
-   表示エンジン
-==================================================== */
-// GraphManager
 
