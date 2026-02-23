@@ -263,11 +263,11 @@
                             <div class="row g-3 mb-4">
                                 <div class="col-6">
                                     <label class="form-label small">最大</label>
-                                    <input type="number" class="form-control" id="freqMinInput" placeholder="周波数の最大値">
+                                    <input type="number" class="form-control" id="freqMinInput" placeholder="周波数の最大値" min="0">
                                 </div>
                                 <div class="col-6">
                                     <label class="form-label small">最小</label>
-                                    <input type="number" class="form-control" id="freqMaxInput" placeholder="周波数の最小値">
+                                    <input type="number" class="form-control" id="freqMaxInput" placeholder="周波数の最小値" min="0">
                                 </div>
                             </div>
                             
@@ -279,7 +279,7 @@
                                 <div class="col-6">
                                     <label class="form-label small">時間範囲</label>
                                     <div class="input-group">
-                                        <input type="number" class="form-control" id="recordDurationSec" placeholder="60">
+                                        <input type="number" class="form-control" id="recordDurationSec" placeholder="時間軸の長さ" min="1" max="600">
                                         <span class="input-group-text">sec</span>
                                     </div>
                                 </div>
