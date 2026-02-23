@@ -313,6 +313,11 @@
 
                         <!-- FFT設定 -->
                         <div class="tab-pane fade" id="fft-tab" role="tabpanel">
+                            <div class="alert alert-secondary small mb-3" id="fftInfo">
+                                周波数範囲: 0 ～ Hz<br>
+                                周波数分解能: Hz
+                            </div>
+
                             <h6 class="border-bottom pb-2 mb-3">サンプリング周波数 (Hz)</h6>
                             <select class="form-select mb-4" id="samplingRate">
                                 <option selected>96000</option>
@@ -326,7 +331,7 @@
 
                             <h6 class="border-bottom pb-2 mb-3">FFT Size</h6>
                             <small class="text-muted">
-                                値が大きいほど周波数分解能は高くなりますが、処理が重くなります
+                                値が大きいほど処理が重くなります
                             </small>
                             <select class="form-select mb-4" id="fftSizeSelect">
                                 <option value="32">32</option>
@@ -341,18 +346,6 @@
                                 <option value="16384">16384</option>
                                 <option value="32768">32768</option>
                             </select>
-
-<!--
-                            <h6 class="border-bottom pb-2 mb-3">FFT Size <small class="text-muted">(1:Fast -> 8:Accurate)</small></h6>
-                            <div class="btn-group w-100" role="group" id="fftSizeGroup">
-                                <input type="radio" class="btn-check" name="fftSize" id="fftSize1" checked><label class="btn btn-outline-primary" for="fftSize1">1</label>
-                                <input type="radio" class="btn-check" name="fftSize" id="fftSize2"><label class="btn btn-outline-primary" for="fftSize2">2</label>
-                                <input type="radio" class="btn-check" name="fftSize" id="fftSize4"><label class="btn btn-outline-primary" for="fftSize4">4</label>
-                                <input type="radio" class="btn-check" name="fftSize" id="fftSize8"><label class="btn btn-outline-primary" for="fftSize8">8</label>
-                                <input type="radio" class="btn-check" name="fftSize" id="fftSize16"><label class="btn btn-outline-primary" for="fftSize16">16</label>
-                                <input type="radio" class="btn-check" name="fftSize" id="fftSize32"><label class="btn btn-outline-primary" for="fftSize32">32</label>
-                            </div>
--->
 
                             <h6 class="border-bottom pb-2 mb-3" id="fftWindow">FFT 窓関数</h6>
                             <div class="mb-4">

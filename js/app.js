@@ -207,7 +207,7 @@ function initializeApp() {
     applyConfigToSystem();
 
     // 入力値バリデーション管理
-    setupInputValidation();
+    setupSettingsEventHandlers();
 
     // グラフ描画処理を初期化
     GraphManager.init(document.getElementById("graph1"), currentConfig);
@@ -383,19 +383,21 @@ function readConfigFromUI() {
 
 
 /* ====================================================
-   UI入力バリデーション管理
+   UI入力変更イベント管理
 ==================================================== */
 
 /**
  * 設定モーダル内の input / select に対して
- * 入力値の正規化のみを行う。
+ * 変更イベント管理を行う。
  *
  * 注意:
- * - currentConfig は変更しない
- * - UI(value)を書き換えるだけ
- * - 無効値は lastValidValues にロールバック
+ * - 入力値の正規化
+ *   - currentConfig は変更しない
+ *   - UI(value)を書き換えるだけ
+ *   - 無効値は lastValidValues にロールバック
+ * - 設定に応じた表示更新
  */
-function setupInputValidation() {
+function setupSettingsEventHandlers() {
 
     const ampMinEl = document.getElementById("minAmplitudeInput");
     const ampMaxEl = document.getElementById("maxAmplitudeInput");
@@ -424,13 +426,37 @@ function setupInputValidation() {
 
     // FFT条件変更時も再正規化
     samplingRateEl.addEventListener("change", () => {
+        updateFftInfoDisplay();
         normalizeFrequencyInputsInUI();
     });
 
     fftSizeEl.addEventListener("change", () => {
+        updateFftInfoDisplay();
         normalizeFrequencyInputsInUI();
     });
 }
+
+/**
+ * samplingRate / fftSize から
+ * 周波数範囲・分解能の表示を更新する。
+ */
+function updateFftInfoDisplay() {
+    const cfg = readConfigFromUI();
+
+    const sr = cfg.samplingRate;
+    const fftSize = cfg.fftSize;
+
+    const df = sr / fftSize;
+    const ny = sr / 2;
+
+    const infoEl = document.getElementById("fftInfo");
+    infoEl.innerHTML =
+        `周波数範囲: 0 ～ ${ny.toFixed(1)} Hz<br> 周波数分解能: ${df.toFixed(3)} Hz`;
+}
+
+/* ====================================================
+   UI入力バリデーション管理
+==================================================== */
 
 
 /**
