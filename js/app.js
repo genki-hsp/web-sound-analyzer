@@ -397,10 +397,21 @@ function readConfigFromUI() {
  */
 function setupInputValidation() {
 
+    const ampMinEl = document.getElementById("minAmplitudeInput");
+    const ampMaxEl = document.getElementById("maxAmplitudeInput");
     const freqMinEl = document.getElementById("freqMinInput");
     const freqMaxEl = document.getElementById("freqMaxInput");
     const samplingRateEl = document.getElementById("samplingRate");
     const fftSizeEl = document.getElementById("fftSizeSelect");
+
+    // 振幅入力
+    ampMinEl.addEventListener("change", () => {
+        normalizeAmplitudeInputInUI();
+    });
+
+    ampMaxEl.addEventListener("change", () => {
+        normalizeAmplitudeInputInUI();
+    });
 
     // 周波数入力
     freqMinEl.addEventListener("change", () => {
@@ -421,6 +432,51 @@ function setupInputValidation() {
     });
 }
 
+
+/**
+ * UI上の minAmplitudeInput / maxAmplitudeInput を正規化する。
+ *
+ * ・NaN / 無効入力 → lastValidValues にロールバック
+ * ・min < max の関係を維持
+ *
+ * currentConfig は変更しない。
+ */
+function normalizeAmplitudeInputInUI() {
+    const minEl = document.getElementById("minAmplitudeInput");
+    const maxEl = document.getElementById("maxAmplitudeInput");
+
+    // UIの現在値から取得
+    const tmpConfig = readConfigFromUI();
+    let ampMin = tmpConfig.minAmplitudeInput;
+    let ampMax = tmpConfig.maxAmplitudeInput;
+
+    // --- 無効値チェック（NaN / null / undefined）---
+    if (!Number.isFinite(ampMin)) { rollbackInputs("minAmplitudeInput"); return; }
+    if (!Number.isFinite(ampMax)) { rollbackInputs("maxAmplitudeInput"); return; }
+
+    if ((ampMin != lastValidValues.minAmplitudeInput)){
+        // 差がゼロ以上にならないよう、最小幅として 1 を与える
+        if (ampMin >= ampMax) {
+            ampMin = ampMax - 1;
+        }
+        // UIへ反映
+        minEl.value = ampMin;
+    }
+    if ((ampMax != lastValidValues.maxAmplitudeInput)){
+        // 差がゼロ以上にならないよう、最小幅として 1 を与える
+        if (ampMax <= ampMin ) {
+            ampMax = ampMin + 1;
+        }
+        // UIへ反映
+        maxEl.value = ampMax;
+    }
+   
+    // 正常値として保存
+    lastValidValues.minAmplitudeInput = ampMin;
+    lastValidValues.maxAmplitudeInput = ampMax;
+}
+
+
 /**
  * UI上の freqMinInput / freqMaxInput を
  * FFT条件（samplingRate / fftSize）に基づき正規化する。
@@ -428,8 +484,6 @@ function setupInputValidation() {
  * ・NaN / 無効入力 → lastValidValues にロールバック
  * ・物理範囲 clamp
  * ・逆転防止
- *
- * currentConfig は変更しない。
  */
 function normalizeFrequencyInputsInUI() {
 
