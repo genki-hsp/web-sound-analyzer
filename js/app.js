@@ -248,6 +248,9 @@ function openSettings() {
     // 現在の設定をUIへ反映
     syncConfigToUI(currentConfig);
 
+    // 周波数範囲・分解能の表示を更新
+    updateFftInfoDisplay();
+
     // 直前正常値を currentConfig で初期化
     lastValidValues = structuredClone(currentConfig);
 
