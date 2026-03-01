@@ -4,6 +4,8 @@
  * ・初回起動時に service-worker.js を登録
  * ・新しい Service Worker が待機状態になったら
  *   「更新あり」と判断して Toast を表示する
+ * ・ユーザーが「更新」を押すと新SWを有効化
+ * ・新SWが有効化されたら自動リロード
  */
 export function registerServiceWorker() {
     if (!("serviceWorker" in navigator)) return;
@@ -11,6 +13,10 @@ export function registerServiceWorker() {
     window.addEventListener("load", async () => {
         try {
             const reg = await navigator.serviceWorker.register("./service-worker.js");
+            // 前回キャンセルされた場合
+            if (reg.waiting) {
+              showUpdateToast(reg);
+            }
 
             // 新しいSWが見つかった時
             reg.addEventListener("updatefound", () => {
@@ -41,13 +47,18 @@ function showUpdateToast(reg) {
     const toastEl = document.getElementById("updateToast");
     if (!toastEl) return;
 
-    const toast = new bootstrap.Toast(toastEl);
+    const toast = bootstrap.Toast.getOrCreateInstance(toastEl, {
+        autohide: false
+    });
     toast.show();
 
     const reloadBtn = document.getElementById("reloadAppBtn");
+
+    // クリックハンドラを毎回上書き（多重登録防止）
     reloadBtn.onclick = () => {
         if (reg.waiting) {
             // 新SWを有効化させる
+            console.log("[PWA] send SKIP_WAITING");
             reg.waiting.postMessage("SKIP_WAITING");
         }
     };
@@ -55,5 +66,6 @@ function showUpdateToast(reg) {
 
 // 新しいSWが有効化されたらページをリロード
 navigator.serviceWorker.addEventListener("controllerchange", () => {
+    console.log("[PWA] controller changed → reload");
     window.location.reload();
 });
