@@ -9,7 +9,7 @@
 /**
  * キャッシュのバージョン
  */
-const CACHE_NAME = "wsoundanalyzer-v20260301-19";
+const CACHE_NAME = "wsoundanalyzer-v20260301-20";
 
 /**
  * 事前キャッシュする最低限のファイル

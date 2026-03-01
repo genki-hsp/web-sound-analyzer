@@ -36,5 +36,37 @@
       "purpose": "maskable"
     }
   ],
+  "screenshots": [
+    {
+      "src": "./screenshots/mobile1.png",
+      "sizes": "392x846",
+      "type": "image/png",
+      "form_factor": "narrow"
+    },
+    {
+      "src": "./screenshots/mobile2.png",
+      "sizes": "392x846",
+      "type": "image/png",
+      "form_factor": "narrow"
+    },
+    {
+      "src": "./screenshots/mobile3.png",
+      "sizes": "392x846",
+      "type": "image/png",
+      "form_factor": "narrow"
+    },
+    {
+      "src": "./screenshots/mobile4.png",
+      "sizes": "392x846",
+      "type": "image/png",
+      "form_factor": "narrow"
+    },
+    {
+      "src": "./screenshots/desktop1.png",
+      "sizes": "958x944",
+      "type": "image/png",
+      "form_factor": "wide"
+    }
+  ],
   "prefer_related_applications": false
 }
