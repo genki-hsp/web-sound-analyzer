@@ -9,29 +9,62 @@
 /**
  * キャッシュのバージョン
  */
-const CACHE_NAME = "wsoundanalyzer-v20260228-9";
+const CACHE_NAME = "wsoundanalyzer-v20260301-16";
 
 /**
  * 事前キャッシュする最低限のファイル
  */
 const ASSETS_TO_CACHE = [
-  "/index.html",
-//  "/manifest.json",
-//  "/icon-192.png",
-//  "/icon-512.png"
+  "./index.html",
+  "./manifest.json",
+  "./js/app.js",
+  "./js/appSound.js",
+  "./js/bootstrap.bundle.js",
+  "./js/plotly-3.3.0.min.js",
+  "./js/pwa.js",
+  "./css/bootstrap.css",
+  "./icons/apple-touch-icon.png",
+  "./icons/bootstrap-icons.css",
+  "./icons/bootstrap-icons.json",
+  "./icons/favicon.ico",
+  "./icons/favicon.svg",
+  "./icons/favicon-96x96.png",
+  "./icons/web-app-manifest-192x192.png",
+  "./icons/web-app-manifest-512x512.png",
+  "./icons/fonts/bootstrap-icons.woff2"
 ];
 
 /* ====================================================
  * install
  * 初回インストール時のみ実行
+ * キャッシュに失敗する場合スキップする
+ * （失敗原因：通信エラー、ファイルup忘れ、ASSETS_TO_CACHEの記載ミスなど）
  * ==================================================== */
 self.addEventListener("install", event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      return cache.addAll(ASSETS_TO_CACHE);
-    })
+    (async () => {
+      const cache = await caches.open(CACHE_NAME);
+
+      for (const url of ASSETS_TO_CACHE) {
+        try {
+          const response = await fetch(url, { cache: "no-cache" });
+
+          if (!response || !response.ok) {
+            console.warn("[SW] skip (not ok):", url);
+            continue;
+          }
+
+          await cache.put(url, response.clone());
+          // console.log("[SW] cached:", url);
+
+        } catch (err) {
+          console.warn("[SW] skip (error):", url, err);
+        }
+      }
+    })()
   );
 });
+
 
 /* ====================================================
  * activate
@@ -72,6 +105,7 @@ self.addEventListener("fetch", event => {
       return fetch(event.request)
         .then(response => {
           // 取得できたらキャッシュに保存
+          if (!response || !response.ok) return response;
           const copy = response.clone();
           caches.open(CACHE_NAME).then(cache => {
             cache.put(event.request, copy);
