@@ -6,6 +6,14 @@
     <link rel="stylesheet" href="./css/bootstrap.css">
     <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="./icons/bootstrap-icons.css">
+    <!-- 基本のファビコン (SVG推奨) -->
+    <link rel="icon" href="./icons/favicon.svg" type="image/svg+xml">
+    <!-- 従来のICO形式 (フォールバック) -->
+    <link rel="icon" href="./icons/favicon.ico" sizes="any">
+    <!-- iOS/Appleデバイス用 -->
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+    <!-- Webアプリマニフェスト -->
+    <link rel="manifest" href="./manifest.json">
     <title>Web Sound Analyzer</title>
     <style>
         /* ================================
@@ -429,9 +437,45 @@
             </div>
         </div>
     </div>
+    <!-- 更新通知 -->
+    <div class="toast-container position-fixed bottom-0 start-50 translate-middle-x p-3">
+        <div id="updateToast"
+            class="toast text-bg-primary border-0"
+            role="alert"
+            aria-live="assertive"
+            aria-atomic="true"
+            data-bs-autohide="false">
+
+            <div class="toast-header text-bg-primary border-0">
+            <strong class="me-auto">更新のお知らせ</strong>
+            <button type="button"
+                    class="btn-close btn-close-white"
+                    data-bs-dismiss="toast"
+                    aria-label="Close"></button>
+            </div>
+
+            <div class="toast-body text-center">
+            <p class="mb-3">
+                新しいバージョンがあります。<br>
+                更新すると最新版になります。
+            </p>
+
+            <button type="button"
+                    class="btn btn-light btn-lg w-100"
+                    id="reloadAppBtn">
+                今すぐ更新
+            </button>
+            </div>
+        </div>
+    </div>
+
     <script src="./js/plotly-3.3.0.min.js" charset="utf-8"></script>
     <script src="./js/bootstrap.bundle.js"></script>
     <script src="./js/app.js"></script>
     <script src="./js/appSound.js"></script>
+    <script type="module">
+        import { registerServiceWorker } from "./js/pwa.js";
+        registerServiceWorker();
+    </script>
 </body>
 </html>

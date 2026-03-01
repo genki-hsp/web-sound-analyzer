@@ -1,0 +1,27 @@
+{
+  "name": "Web Sound Analyzer",
+  "short_name": "WSAnalyzer",
+  "start_url": ".",
+  "display": "standalone",
+  "description": "音声解析ツール。マイクで拾った音をリアルタイムで波形, FFT, スペクトログラム, ウォーターフォールを見ることができる。",
+  "lang": "ja",
+  "dir": "auto",
+  "theme_color": "#ffffff",
+  "background_color": "#ffffff",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "./icons/web-app-manifest-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "./icons/web-app-manifest-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "prefer_related_applications": false
+}
