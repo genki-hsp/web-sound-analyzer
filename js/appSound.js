@@ -1436,7 +1436,8 @@ const GraphManager = (function () {
         stop,
         applyConfig,
         setGraph1Type,
-        setGraph2Type
+        setGraph2Type,
+        updateAllPanelVisibility
     };
 
 })();

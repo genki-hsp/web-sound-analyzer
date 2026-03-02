@@ -275,6 +275,9 @@ function applySettings() {
     // 各マネージャへ反映
     applyConfigToSystem();
 
+    // グラフレイアウトを更新
+    GraphManager.updateAllPanelVisibility();
+
     settingsModal.hide();
 }
 
