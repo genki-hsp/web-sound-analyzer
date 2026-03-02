@@ -1144,9 +1144,11 @@ const GraphManager = (function () {
     function updateWaveform(panel, waveform) {
         if (!waveform) return;
 
-        // サンプル番号を x 軸にする
-        // 後で時間時変える。
-        const x = Array.from({ length: waveform.length }, (_, i) => i);
+        // サンプリング周波数[Hz]
+        const fs = MeasurementController.getSampleRate();
+
+        // 秒単位の時間軸を作る
+        const x = Array.from({ length: waveform.length }, (_, i) => i / fs);
 
         Plotly.restyle(panel.divId, {
             y: [Array.from(waveform)],
